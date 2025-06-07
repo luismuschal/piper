@@ -2,8 +2,8 @@
 
 all:
 	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install
-	cmake --build build --config Release
-	cd build && ctest --config Release
+	cmake --build build
+	cd build && ctest
 	cmake --install build
 
 docker:
