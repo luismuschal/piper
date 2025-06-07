@@ -1,7 +1,7 @@
 .PHONY: clean docker
 
 all:
-	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install
+	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install -DCMAKE_BUILD_TYPE=Release
 	cmake --build build
 	cd build && ctest
 	cmake --install build
