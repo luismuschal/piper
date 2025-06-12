@@ -1,9 +1,9 @@
 .PHONY: clean
 
 all:
-	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install
-	cmake --build build --config Release
-	cd build && ctest --config Release
+	cmake -Bbuild -DCMAKE_INSTALL_PREFIX=install -DCMAKE_BUILD_TYPE=Release
+	cmake --build build
+	cd build && ctest
 	cmake --install build
 
 clean:

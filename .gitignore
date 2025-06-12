@@ -21,3 +21,14 @@ htmlcov
 .venv/
 lightning_logs/
 voices/
+
+install/
+build/
+pp/install/
+*.onnx
+*.onnx.json
+pp/lib/
+pp/download/
+
+log.txt
+out.wav
