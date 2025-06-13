@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# Download and prepare the Thorsten low German TTS voice for Piper
-# This script creates a directory named "thorsten_low" next to itself (if it
-# doesn't already exist) and then downloads the ONNX model and its accompanying
-# JSON configuration into that directory with canonical names.
+# Download and prepare Piper TTS voices
+# This script downloads voices by name, automatically fetching all available
+# qualities for both German and English languages.
 #
 # Usage:
-#   ./setup.sh
+#   ./setup.sh <voice_name>
+#   ./setup.sh thorsten
+#   ./setup.sh amy
 #
 # Requirements:
 #   • curl (or wget – edit the script if you prefer wget)
@@ -13,28 +14,96 @@
 
 set -euo pipefail
 
+# Check if voice name was provided
+if [ $# -eq 0 ]; then
+    echo "Usage: $0 <voice_name>"
+    echo "Example: $0 thorsten"
+    echo "Example: $0 amy"
+    exit 1
+fi
+
+VOICE_NAME="$1"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
-TARGET_DIR="${SCRIPT_DIR}/thorsten_low"
+BASE_URL="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0"
 
-MODEL_URL="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/low/de_DE-thorsten-low.onnx?download=true"
-CONFIG_URL="https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/de/de_DE/thorsten/low/de_DE-thorsten-low.onnx.json?download=true"
+# Define language codes to check
+LANGUAGES=(
+    "de:de_DE"
+    "en:en_US"
+    "en:en_GB"
+)
 
-mkdir -p "${TARGET_DIR}"
+# Define qualities to try
+QUALITIES=(
+    "x_low"
+    "low"
+    "medium"
+    "high"
+)
 
-# Download model if it does not exist or if the file size is unexpectedly small
-if [[ ! -s "${TARGET_DIR}/thorsten_low.onnx" ]]; then
-  echo "Downloading Thorsten low ONNX model …"
-  curl -L "${MODEL_URL}" -o "${TARGET_DIR}/thorsten_low.onnx"
+# Function to download a voice
+download_voice() {
+    local lang_short="$1"
+    local lang_code="$2"
+    local voice="$3"
+    local quality="$4"
+    
+    local model_url="${BASE_URL}/${lang_short}/${lang_code}/${voice}/${quality}/${lang_code}-${voice}-${quality}.onnx?download=true"
+    local config_url="${BASE_URL}/${lang_short}/${lang_code}/${voice}/${quality}/${lang_code}-${voice}-${quality}.onnx.json?download=true"
+    
+    local target_dir="${SCRIPT_DIR}/${voice}/${lang_code}/${quality}"
+    local model_file="${target_dir}/${voice}_${quality}.onnx"
+    local config_file="${target_dir}/${voice}_${quality}.onnx.json"
+    
+    # Create temporary files to test download
+    local temp_model=$(mktemp)
+    local temp_config=$(mktemp)
+    
+    # Try to download model
+    echo "Trying ${lang_code} ${voice} ${quality}..."
+    if curl -f -L "${model_url}" -o "${temp_model}" 2>/dev/null; then
+        # Try to download config
+        if curl -f -L "${config_url}" -o "${temp_config}" 2>/dev/null; then
+            # Both downloads successful, now create directory and move files
+            mkdir -p "${target_dir}"
+            mv "${temp_model}" "${model_file}"
+            mv "${temp_config}" "${config_file}"
+            echo "✓ Downloaded ${lang_code} ${voice} ${quality}"
+            return 0
+        else
+            echo "✗ Config not available for ${lang_code} ${voice} ${quality}"
+            rm -f "${temp_model}" "${temp_config}"
+            return 1
+        fi
+    else
+        rm -f "${temp_model}" "${temp_config}"
+        return 1
+    fi
+}
+
+# Main download loop
+echo "Downloading all available qualities for voice: ${VOICE_NAME}"
+echo "Checking German and English languages..."
+echo
+
+found_any=false
+
+for lang_pair in "${LANGUAGES[@]}"; do
+    IFS=':' read -r lang_short lang_code <<< "${lang_pair}"
+    
+    for quality in "${QUALITIES[@]}"; do
+        if download_voice "${lang_short}" "${lang_code}" "${VOICE_NAME}" "${quality}"; then
+            found_any=true
+        fi
+    done
+done
+
+echo
+if [ "${found_any}" = true ]; then
+    echo "✓ Successfully downloaded voice(s) for: ${VOICE_NAME}"
+    echo "Files are located in: ${SCRIPT_DIR}/${VOICE_NAME}/"
 else
-  echo "ONNX model already exists – skipping download."
+    echo "✗ No voices found for: ${VOICE_NAME}"
+    echo "Please check the voice name and try again."
+    exit 1
 fi
-
-# Download config if it does not exist
-if [[ ! -s "${TARGET_DIR}/thorsten_low.onnx.json" ]]; then
-  echo "Downloading Thorsten low model config …"
-  curl -L "${CONFIG_URL}" -o "${TARGET_DIR}/thorsten_low.onnx.json"
-else
-  echo "Config JSON already exists – skipping download."
-fi
-
-echo "Thorsten low voice is ready in: ${TARGET_DIR}"
